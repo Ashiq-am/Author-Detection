@@ -1,0 +1,195 @@
+import pandas as pd 
+
+data = pd.read_csv("train.csv")
+data.head()
+
+# Edgar Allan Poe, Mary Shelley and HP Lovecraft
+def pretty_print_author_info(data, print_rows=100):
+  for i in range(print_rows):
+    if data.iloc[i].author == "EAP":
+      print(f'ROW ---> {i}')
+      print("Author Name: Edgar Allan Poe \nText: {}".format(data.iloc[i].text) )
+    elif data.iloc[i].author == "HPL":
+      print(f'ROW ---> {i}')
+      print("Author Name: HP Lovecraft \nText: {}".format(data.iloc[i].text) )
+    else:
+      print(f'ROW ---> {i}')
+      print("Author Name: Mary Shelley \nText: {}".format(data.iloc[i].text) )
+
+pretty_print_author_info(data, print_rows=100)
+
+from sklearn.preprocessing import LabelEncoder
+enc = LabelEncoder()
+
+data.keys()
+
+data.shape
+
+data['author'] = enc.fit_transform(data.author)
+
+data.head()
+
+import nltk
+nltk.download('wordnet')
+
+# remove punctuation
+import string
+def remove_punc(text):
+  non_punc = []
+  for char in text:
+    if char not in string.punctuation:
+      non_punc.append(char)
+  
+  return "".join(non_punc)
+
+# testing the remove_punc function 
+random_string= """Wilbur's growth was indeed phenomenal, for within three months of his birth he had attained a size and muscular power not usually found in infants under a full year of age."""
+print(remove_punc(random_string))
+
+# lemmatization 
+from nltk.stem import WordNetLemmatizer
+
+def lemmatization(nopunct_sentence):
+  lemmatizer = WordNetLemmatizer()
+  if any(punc in nopunct_sentence for punc in string.punctuation):
+    raise Exception("The sentence contains punctuation")
+  else:
+    lem_string=""
+    list_of_words = nopunct_sentence.split()
+    for word in list_of_words:
+      lemma = lemmatizer.lemmatize(word, pos="v")
+      lem_string += lemma + " "
+    return lem_string
+
+ print(lemmatization(remove_punc(random_string)) )
+
+from nltk.corpus import stopwords
+nltk.download('stopwords')
+
+def stopwords_removal(sentence):
+  stop_words = stopwords.words('english')
+  fine_tuned_sentence =[]
+  for word in sentence.split():
+    if word not in stop_words:
+      fine_tuned_sentence.append(word)
+  return fine_tuned_sentence
+
+print(stopwords_removal(lemmatization(remove_punc(random_string))))
+
+def process_sentence(text):
+    no_punct = remove_punc(text)
+    lem_sen = lemmatization(no_punct)
+    return stopwords_removal(lem_sen)
+
+features = data['text']
+labels = data['author']
+
+from sklearn.feature_extraction.text import CountVectorizer
+bow_transformer=CountVectorizer(analyzer=process_sentence).fit(features)
+
+features = bow_transformer.transform(features)
+
+features.shape
+
+# spillting the data into train and text
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.2)
+
+print(X_train.shape)
+print(X_test.shape)
+
+#### Model Implementation
+
+from sklearn.neural_network import MLPClassifier
+nn_model = MLPClassifier(hidden_layer_sizes=[7, 11, 5] , activation='relu', solver ='adam',  max_iter=500)
+
+nn_model.fit(X_train, y_train)
+
+print("The training accuracy of the model is {:.2f}".format(nn_model.score(X_train, y_train)*100) )
+
+print("The training accuracy of the model is {:.2f}".format(nn_model.score(X_test, y_test)*100) )
+
+import matplotlib.pyplot as plt
+
+fig = plt.figure(figsize=(10,5))
+names = ["Train Accuracy", "Test Accuracy"]
+acc = [100., 77.07]
+
+plt.bar(names, acc)
+plt.savefig("acc.png", bbox_inches = "tight")
+
+### Working with the testing data
+
+kaggle_test_data = pd.read_csv('test.csv')
+kaggle_test_data.head()
+
+# processing the testing data 
+X_test_kaggle = bow_transformer.transform(kaggle_test_data['text'])
+
+nn_model.predict(X_test_kaggle[0])
+
+## Data Visualization
+
+data = pd.read_csv("train.csv")
+data.head()
+
+# displaying the WordCloud of each author 
+# Edgar Allan Poe, Mary Shelley and HP Lovecraft (EAP, MWS, HPL)
+EAP_arr = data.loc[data['author'] == "EAP"]
+MWS_arr = data.loc[data['author'] == 'MWS']
+HPL_arr = data.loc[data['author'] == 'HPL']
+
+EAP_arr.head()
+
+def make_corpus_of_strings(dataframe):
+    bag_of_strings = ""
+    for row in range(dataframe.shape[0]):
+      text = dataframe.iloc[row]['text'].strip()
+      text+=" "
+      bag_of_strings += text
+    return bag_of_strings
+
+
+bos_eap = make_corpus_of_strings(EAP_arr)
+bos_mws = make_corpus_of_strings(MWS_arr)
+bos_hpl = make_corpus_of_strings(HPL_arr)
+
+
+print(bos_eap)
+
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+
+# for the author EAP
+eap_wordcloud = WordCloud().generate("".join([word+" " for word in process_sentence(bos_eap)]))
+plt.imshow(eap_wordcloud, interpolation='bilinear')
+plt.show()
+plt.savefig("eap.png", bbox_inches="tight")
+
+# for the author MWS
+mws_wordcloud = WordCloud().generate("".join([word+" " for word in process_sentence(bos_mws)]) )
+plt.imshow(mws_wordcloud, interpolation='bilinear')
+plt.show()
+plt.savefig("mws.png", bbox_inches="tight")
+
+# for the author HPL
+hpl_wordcloud = WordCloud().generate("".join([word+" " for word in process_sentence(bos_hpl)]))
+plt.imshow(hpl_wordcloud, interpolation='bilinear')
+plt.show()
+plt.savefig("hpl.png", bbox_inches="tight")
+
+### Making all the predictions
+
+
+
+nn_model.predict(X_test_kaggle[0])
+
+pred = enc.inverse_transform(nn_model.predict(X_test_kaggle))
+
+# Adding labels to the test data
+
+kaggle_test_data["predicted_labels"] = pred
+kaggle_test_data.head()
+
+nn_model.predict(X_test_kaggle[0])
+
